@@ -1,8 +1,6 @@
 package cache
 
 import (
-	"bytes"
-	"encoding/gob"
 	"errors"
 	"runtime"
 	"sync"
@@ -33,33 +31,4 @@ func (c *Cache[K, V]) Get(key K) (*V, bool) {
 		}
 	}
 	return nil, false
-}
-
-type cachedObject struct {
-	data []byte
-}
-
-// ObjectCache is a cache for transient objects.
-type ObjectCache[K comparable, V any] struct {
-	data Cache[K, cachedObject]
-}
-
-func (c *ObjectCache[K, V]) Put(key K, object *V) error {
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(object); err != nil {
-		return err
-	}
-	c.data.Put(key, &cachedObject{buf.Bytes()})
-	return nil
-}
-
-func (c *ObjectCache[K, V]) Get(key K) (*V, error) {
-	if co, ok := c.data.Get(key); ok {
-		var obj V
-		if err := gob.NewDecoder(bytes.NewReader(co.data)).Decode(&obj); err != nil {
-			return nil, err
-		}
-		return &obj, nil
-	}
-	return nil, ErrCacheMiss
 }
