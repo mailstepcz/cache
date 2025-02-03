@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"runtime"
 	"sync"
 	"unsafe"
 )
@@ -26,11 +25,12 @@ func (c *Cache[K, V]) Put(key K, value *V) {
 
 	obj := &cacheObject[V]{ptr: uintptr(unsafe.Pointer(value))}
 	c.data[key] = obj
-	runtime.SetFinalizer(value, func(_ *V) {
-		c.lock.Lock()
-		defer c.lock.Unlock()
-		delete(c.data, key)
-	})
+	// use AddCleanup here
+	// runtime.SetFinalizer(value, func(_ *V) {
+	// 	c.lock.Lock()
+	// 	defer c.lock.Unlock()
+	// 	delete(c.data, key)
+	// })
 }
 
 func (c *Cache[K, V]) Get(key K) (*V, bool) {
