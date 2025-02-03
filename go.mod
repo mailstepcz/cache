@@ -1,6 +1,6 @@
 module github.com/mailstepcz/cache
 
-go 1.24rc2
+go 1.23
 
 require github.com/stretchr/testify v1.10.0
 
