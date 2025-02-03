@@ -36,8 +36,10 @@ func (c *Cache[K, V]) Put(key K, value *V) {
 func (c *Cache[K, V]) Get(key K) (*V, bool) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+
 	if obj, ok := c.data[key]; ok {
 		return (*V)(unsafe.Pointer(obj.ptr)), true
 	}
+
 	return nil, false
 }
