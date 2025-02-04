@@ -33,6 +33,11 @@ func (c *Cache[K, V]) Put(key K, value *V) {
 	// })
 }
 
+func (c *Cache[K, V]) PutValue(key K, value V) V {
+	c.Put(key, &value)
+	return value
+}
+
 func (c *Cache[K, V]) Get(key K) (*V, bool) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
