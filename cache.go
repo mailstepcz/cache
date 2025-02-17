@@ -13,15 +13,16 @@ type cacheObject[T any] struct {
 type Cache[K comparable, V any] struct {
 	lock sync.RWMutex
 	data map[K]*cacheObject[V]
+	once sync.Once
 }
 
 func (c *Cache[K, V]) Put(key K, value *V) {
+	c.once.Do(func() {
+		c.data = make(map[K]*cacheObject[V])
+	})
+
 	c.lock.Lock()
 	defer c.lock.Unlock()
-
-	if c.data == nil {
-		c.data = make(map[K]*cacheObject[V])
-	}
 
 	obj := &cacheObject[V]{ptr: uintptr(unsafe.Pointer(value))}
 	c.data[key] = obj
