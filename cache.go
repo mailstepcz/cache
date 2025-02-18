@@ -1,12 +1,15 @@
 package cache
 
 import (
+	"runtime"
 	"sync"
 	"unsafe"
 )
 
+// TransientPtr is a transient pointer.
 type TransientPtr uintptr
 
+// UnsafePointer returns the pointer as an unsafe pointer.
 func (tp TransientPtr) UnsafePointer() unsafe.Pointer {
 	return unsafe.Pointer(tp)
 }
@@ -32,12 +35,7 @@ func (c *Cache[K, V]) Put(key K, value *V) {
 
 	obj := &cacheObject[V]{ptr: TransientPtr(unsafe.Pointer(value))}
 	c.data[key] = obj
-	// use AddCleanup here
-	// runtime.SetFinalizer(value, func(_ *V) {
-	// 	c.lock.Lock()
-	// 	defer c.lock.Unlock()
-	// 	delete(c.data, key)
-	// })
+	runtime.SetFinalizer(value, func(_ *V) {})
 }
 
 func (c *Cache[K, V]) PutValue(key K, value V) V {
