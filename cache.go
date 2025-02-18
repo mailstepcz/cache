@@ -35,7 +35,13 @@ func (c *Cache[K, V]) Put(key K, value *V) {
 
 	obj := &cacheObject[V]{ptr: TransientPtr(unsafe.Pointer(value))}
 	c.data[key] = obj
-	runtime.SetFinalizer(value, func(_ *V) {})
+	runtime.SetFinalizer(value, func(_ *V) {
+		go func() {
+			c.lock.Lock()
+			defer c.lock.Unlock()
+			delete(c.data, key)
+		}()
+	})
 }
 
 func (c *Cache[K, V]) PutValue(key K, value V) V {
