@@ -5,8 +5,14 @@ import (
 	"unsafe"
 )
 
+type TransientPtr uintptr
+
+func (tp TransientPtr) UnsafePointer() unsafe.Pointer {
+	return unsafe.Pointer(tp)
+}
+
 type cacheObject[T any] struct {
-	ptr uintptr
+	ptr TransientPtr
 }
 
 // Cache is a cache for transient values.
@@ -24,7 +30,7 @@ func (c *Cache[K, V]) Put(key K, value *V) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	obj := &cacheObject[V]{ptr: uintptr(unsafe.Pointer(value))}
+	obj := &cacheObject[V]{ptr: TransientPtr(unsafe.Pointer(value))}
 	c.data[key] = obj
 	// use AddCleanup here
 	// runtime.SetFinalizer(value, func(_ *V) {
@@ -44,7 +50,7 @@ func (c *Cache[K, V]) Get(key K) (*V, bool) {
 	defer c.lock.RUnlock()
 
 	if obj, ok := c.data[key]; ok {
-		return (*V)(unsafe.Pointer(obj.ptr)), true
+		return (*V)(obj.ptr.UnsafePointer()), true
 	}
 
 	return nil, false
