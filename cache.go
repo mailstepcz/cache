@@ -27,9 +27,9 @@ func (c *Cache[K, V]) Put(key K, value *V) {
 	obj := &cacheObject[V]{ptr: TransientPtr(unsafe.Pointer(value))}
 	c.data.Store(key, obj)
 	runtime.SetFinalizer(value, func(_ *V) {
-		// go func() {
-		// 	c.data.Delete(key)
-		// }()
+		 go func() {
+		 	c.data.Delete(key)
+		 }()
 	})
 }
 
