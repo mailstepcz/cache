@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	// ErrCacheMiss indicates a cache mis..
+	// ErrCacheMiss indicates a cache miss.
 	ErrCacheMiss = errors.New("cache miss")
 )
 
