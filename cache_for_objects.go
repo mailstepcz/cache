@@ -3,6 +3,12 @@ package cache
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
+)
+
+var (
+	// ErrCacheMiss indicates a cache mis..
+	ErrCacheMiss = errors.New("cache miss")
 )
 
 type ocachedObject struct {

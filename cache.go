@@ -1,16 +1,22 @@
 package cache
 
 import (
-	"errors"
 	"runtime"
 	"sync"
-	"weak"
+	"unsafe"
 )
 
-var (
-	// ErrCacheMiss indicates a cache miss.
-	ErrCacheMiss = errors.New("cache miss")
-)
+// TransientPtr is a transient pointer.
+type TransientPtr uintptr
+
+// UnsafePointer returns the pointer as an unsafe pointer.
+func (tp TransientPtr) UnsafePointer() unsafe.Pointer {
+	return unsafe.Pointer(tp)
+}
+
+type cacheObject[T any] struct {
+	ptr TransientPtr
+}
 
 // Cache is a cache for transient values.
 type Cache[K comparable, V any] struct {
@@ -18,17 +24,25 @@ type Cache[K comparable, V any] struct {
 }
 
 func (c *Cache[K, V]) Put(key K, value *V) {
-	c.data.Store(key, weak.Make(value))
-	runtime.AddCleanup(value, func(key K) {
-		c.data.Delete(key)
-	}, key)
+	obj := &cacheObject[V]{ptr: TransientPtr(unsafe.Pointer(value))}
+	c.data.Store(key, obj)
+	runtime.SetFinalizer(value, func(_ *V) {
+		// go func() {
+		// 	c.data.Delete(key)
+		// }()
+	})
+}
+
+func (c *Cache[K, V]) PutValue(key K, value V) V {
+	c.Put(key, &value)
+	return value
 }
 
 func (c *Cache[K, V]) Get(key K) (*V, bool) {
-	if ptr, ok := c.data.Load(key); ok {
-		if value := ptr.(weak.Pointer[V]).Value(); value != nil {
-			return value, true
-		}
+	if obj, ok := c.data.Load(key); ok {
+		obj := obj.(*cacheObject[V])
+		return (*V)(obj.ptr.UnsafePointer()), true
 	}
+
 	return nil, false
 }
