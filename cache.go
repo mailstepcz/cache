@@ -3,6 +3,7 @@ package cache
 import (
 	"runtime"
 	"sync"
+	"time"
 	"unsafe"
 )
 
@@ -27,9 +28,17 @@ func (c *Cache[K, V]) Put(key K, value *V) {
 	obj := &cacheObject[V]{ptr: TransientPtr(unsafe.Pointer(value))}
 	c.data.Store(key, obj)
 	runtime.SetFinalizer(value, func(_ *V) {
-		 go func() {
-		 	c.data.Delete(key)
-		 }()
+		// use 'add cleanup' here once available
+		// go func() {
+		// 	c.data.Delete(key)
+		// }()
+	})
+}
+
+func (c *Cache[K, V]) PutExpiring(key K, value *V, exp time.Duration) {
+	c.Put(key, value)
+	time.AfterFunc(exp, func() {
+		c.data.Delete(key)
 	})
 }
 
