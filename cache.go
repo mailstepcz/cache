@@ -49,6 +49,15 @@ func (c *Cache[K, V]) PutValue(key K, value V) V {
 	return value
 }
 
+func (c *Cache[K, V]) PutExpiring(key K, value *V, exp time.Duration) {
+	c.Put(key, value)
+	time.AfterFunc(exp, func() {
+			c.lock.Lock()
+			defer c.lock.Unlock()
+			delete(c.data, key)
+	})
+}
+
 func (c *Cache[K, V]) Get(key K) (*V, bool) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
