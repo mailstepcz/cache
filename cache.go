@@ -4,6 +4,7 @@ import (
 	"runtime"
 	"sync"
 	"unsafe"
+	"time"
 )
 
 // TransientPtr is a transient pointer.
