@@ -29,9 +29,9 @@ func (c *Cache[K, V]) Put(key K, value *V) {
 	c.data.Store(key, obj)
 	runtime.SetFinalizer(value, func(_ *V) {
 		// use 'add cleanup' here once available
-		// go func() {
-		// 	c.data.Delete(key)
-		// }()
+		go func() {
+			c.data.Delete(key)
+		}()
 	})
 }
 
