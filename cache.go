@@ -16,7 +16,9 @@ func (tp TransientPtr) UnsafePointer() unsafe.Pointer {
 }
 
 type cacheObject[T any] struct {
-	ptr TransientPtr
+	ptr     TransientPtr
+	timer   *time.Timer
+	version int
 }
 
 // Cache is a cache for transient values.
@@ -24,8 +26,15 @@ type Cache[K comparable, V any] struct {
 	data sync.Map
 }
 
-func (c *Cache[K, V]) Put(key K, value *V) {
-	obj := &cacheObject[V]{ptr: TransientPtr(unsafe.Pointer(value))}
+func (c *Cache[K, V]) Put(key K, value *V) *cacheObject[V] {
+	var ver int
+	if obj, ok := c.data.Load(key); ok {
+		obj := obj.(*cacheObject[V])
+		obj.timer.Stop()
+		ver = obj.version + 1
+	}
+
+	obj := &cacheObject[V]{ptr: TransientPtr(unsafe.Pointer(value)), version: ver}
 	c.data.Store(key, obj)
 	runtime.SetFinalizer(value, func(_ *V) {
 		/* use 'add cleanup' here once available
@@ -33,11 +42,13 @@ func (c *Cache[K, V]) Put(key K, value *V) {
 			c.data.Delete(key)
 		}()*/
 	})
+
+	return obj
 }
 
 func (c *Cache[K, V]) PutExpiring(key K, value *V, exp time.Duration) {
-	c.Put(key, value)
-	time.AfterFunc(exp, func() {
+	obj := c.Put(key, value)
+	obj.timer = time.AfterFunc(exp, func() {
 		c.data.Delete(key)
 	})
 }
