@@ -3,8 +3,8 @@ package cache
 import (
 	"runtime"
 	"sync"
-	"unsafe"
 	"time"
+	"unsafe"
 )
 
 // TransientPtr is a transient pointer.
@@ -16,7 +16,9 @@ func (tp TransientPtr) UnsafePointer() unsafe.Pointer {
 }
 
 type cacheObject[T any] struct {
-	ptr TransientPtr
+	ptr     TransientPtr
+	timer   *time.Timer
+	version int
 }
 
 // Cache is a cache for transient values.
@@ -26,7 +28,7 @@ type Cache[K comparable, V any] struct {
 	once sync.Once
 }
 
-func (c *Cache[K, V]) Put(key K, value *V) {
+func (c *Cache[K, V]) Put(key K, value *V) *cacheObject[V] {
 	c.once.Do(func() {
 		c.data = make(map[K]*cacheObject[V])
 	})
@@ -34,7 +36,13 @@ func (c *Cache[K, V]) Put(key K, value *V) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	obj := &cacheObject[V]{ptr: TransientPtr(unsafe.Pointer(value))}
+	var ver int
+	if obj, ok := c.data[key]; ok {
+		obj.timer.Stop()
+		ver = obj.version + 1
+	}
+
+	obj := &cacheObject[V]{ptr: TransientPtr(unsafe.Pointer(value)), version: ver}
 	c.data[key] = obj
 	runtime.SetFinalizer(value, func(_ *V) {
 		/* use 'add cleanup' here once available // go func() {
@@ -43,6 +51,8 @@ func (c *Cache[K, V]) Put(key K, value *V) {
 			delete(c.data, key)
 		}()*/
 	})
+
+	return obj
 }
 
 func (c *Cache[K, V]) PutValue(key K, value V) V {
@@ -51,11 +61,11 @@ func (c *Cache[K, V]) PutValue(key K, value V) V {
 }
 
 func (c *Cache[K, V]) PutExpiring(key K, value *V, exp time.Duration) {
-	c.Put(key, value)
-	time.AfterFunc(exp, func() {
-			c.lock.Lock()
-			defer c.lock.Unlock()
-			delete(c.data, key)
+	obj := c.Put(key, value)
+	obj.timer = time.AfterFunc(exp, func() {
+		c.lock.Lock()
+		defer c.lock.Unlock()
+		delete(c.data, key)
 	})
 }
 
