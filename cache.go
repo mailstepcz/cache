@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"runtime"
 	"sync"
 	"time"
 	"unsafe"
@@ -19,11 +18,13 @@ type cacheObject[T any] struct {
 	ptr     TransientPtr
 	timer   *time.Timer
 	version int
+	cleanup func()
 }
 
 // Cache is a cache for transient values.
 type Cache[K comparable, V any] struct {
-	data sync.Map
+	data     sync.Map
+	expulser expulser[cacheObject[V]]
 }
 
 func (c *Cache[K, V]) Put(key K, value *V) *cacheObject[V] {
@@ -31,16 +32,23 @@ func (c *Cache[K, V]) Put(key K, value *V) *cacheObject[V] {
 	if obj, ok := c.data.Load(key); ok {
 		obj := obj.(*cacheObject[V])
 		obj.timer.Stop()
+		obj.cleanup()
 		ver = obj.version + 1
 	}
 
 	obj := &cacheObject[V]{ptr: TransientPtr(unsafe.Pointer(value)), version: ver}
 	c.data.Store(key, obj)
-	runtime.SetFinalizer(value, func(_ *V) {
-		/* use 'add cleanup' here once available
-		go func() {
-			c.data.Delete(key)
-		}()*/
+	obj.cleanup = c.expulser.add(obj, func() {
+		if obj, ok := c.data.Load(key); ok {
+			obj := obj.(*cacheObject[V])
+			if ver != obj.version {
+				if obj.timer != nil {
+					obj.timer.Stop()
+				}
+				return
+			}
+		}
+		c.data.Delete(key)
 	})
 
 	return obj
@@ -50,6 +58,7 @@ func (c *Cache[K, V]) PutExpiring(key K, value *V, exp time.Duration) {
 	obj := c.Put(key, value)
 	obj.timer = time.AfterFunc(exp, func() {
 		c.data.Delete(key)
+		obj.cleanup()
 	})
 }
 
