@@ -26,10 +26,10 @@ type Cache[K comparable, V any] struct {
 	data sync.Map
 }
 
-func (c *Cache[K, V]) Put(key K, value *V) {
+func (c *Cache[K, V]) Put(key K, value *V) *cacheObject[V] {
 	var ver int
-  if obj, ok := c.data.Load(key); ok {
-    obj := obj.(*cacheObject[V])
+	if obj, ok := c.data.Load(key); ok {
+		obj := obj.(*cacheObject[V])
 		obj.timer.Stop()
 		ver = obj.version + 1
 	}
