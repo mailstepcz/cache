@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"iter"
 	"runtime"
 	"sync"
 	"time"
@@ -8,15 +9,15 @@ import (
 )
 
 // TransientPtr is a transient pointer.
-type TransientPtr uintptr
+type TransientPtr[T any] uintptr
 
-// UnsafePointer returns the pointer as an unsafe pointer.
-func (tp TransientPtr) UnsafePointer() unsafe.Pointer {
-	return unsafe.Pointer(tp)
+// Pointer returns the pointer as an unsafe pointer.
+func (tp TransientPtr[T]) Pointer() *T {
+	return (*T)(unsafe.Pointer(&tp))
 }
 
 type cacheObject[T any] struct {
-	ptr     TransientPtr
+	ptr     TransientPtr[T]
 	timer   *time.Timer
 	version int
 }
@@ -26,26 +27,28 @@ type Cache[K comparable, V any] struct {
 	data sync.Map
 }
 
+// Put puts new value into the cache.
 func (c *Cache[K, V]) Put(key K, value *V) *cacheObject[V] {
 	var ver int
 	if obj, ok := c.data.Load(key); ok {
 		obj := obj.(*cacheObject[V])
-		obj.timer.Stop()
+		if obj.timer != nil {
+			obj.timer.Stop()
+		}
 		ver = obj.version + 1
 	}
 
-	obj := &cacheObject[V]{ptr: TransientPtr(unsafe.Pointer(value)), version: ver}
+	obj := &cacheObject[V]{ptr: TransientPtr[V](unsafe.Pointer(value)), version: ver, timer: nil}
 	c.data.Store(key, obj)
 	runtime.SetFinalizer(value, func(_ *V) {
-		/* use 'add cleanup' here once available
-		go func() {
-			c.data.Delete(key)
-		}()*/
+		c.data.Delete(key)
 	})
 
 	return obj
 }
 
+// PutExpiring puts new value to the cache. Value will be removed after specified expiration.
+// If value is cleaned by GC value can be removed sooner.
 func (c *Cache[K, V]) PutExpiring(key K, value *V, exp time.Duration) {
 	obj := c.Put(key, value)
 	obj.timer = time.AfterFunc(exp, func() {
@@ -53,16 +56,28 @@ func (c *Cache[K, V]) PutExpiring(key K, value *V, exp time.Duration) {
 	})
 }
 
+// PutValue inserts new value to the cache. And returns inserted value.
 func (c *Cache[K, V]) PutValue(key K, value V) V {
 	c.Put(key, &value)
 	return value
 }
 
+// Get returns value in cache and flag which indicates that value is available.
 func (c *Cache[K, V]) Get(key K) (*V, bool) {
 	if obj, ok := c.data.Load(key); ok {
 		obj := obj.(*cacheObject[V])
-		return (*V)(obj.ptr.UnsafePointer()), true
+		return obj.ptr.Pointer(), true
 	}
 
 	return nil, false
+}
+
+// GetAll returns all values stored in cache.
+func (c *Cache[K, V]) GetAll() iter.Seq2[K, *V] {
+	return func(yield func(K, *V) bool) {
+		c.data.Range(func(key, value any) bool {
+			return yield(key.(K), value.(*cacheObject[V]).ptr.Pointer())
+		})
+	}
+
 }

@@ -2,9 +2,9 @@ name: Test
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
@@ -24,6 +24,6 @@ jobs:
         run: |
           # Vet & test
           go install golang.org/x/lint/golint@latest
-          go vet -v -unsafeptr=false ./...
+          go vet -v ./...
           go test -v ./...
           golint -set_exit_status ./...
