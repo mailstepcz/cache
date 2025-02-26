@@ -3,13 +3,12 @@ package cache
 import (
 	"iter"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
 type cacheObject[T any] struct {
 	ptr       transientPtr[T]
-	timestamp atomic.Int64
+	timestamp int64
 }
 
 // Cache is a cache for transient values.
@@ -24,12 +23,11 @@ func (c *Cache[K, V]) Put(key K, value *V) *cacheObject[V] {
 	obj := &cacheObject[V]{ptr: makeTransientPtrGC(value, func() {
 		if obj, ok := c.data.Load(key); ok {
 			obj := obj.(*cacheObject[V])
-			if timestamp == obj.timestamp.Load() {
+			if timestamp == obj.timestamp {
 				c.data.Delete(key)
 			}
 		}
-	})}
-	obj.timestamp.Store(timestamp)
+	}), timestamp: timestamp}
 
 	c.data.Store(key, obj)
 
@@ -43,13 +41,12 @@ func (c *Cache[K, V]) PutExpiring(key K, value *V, exp time.Duration) {
 	obj := &cacheObject[V]{ptr: makeTransientPtrExpiring(value, exp, func() {
 		if obj, ok := c.data.Load(key); ok {
 			obj := obj.(*cacheObject[V])
-			if timestamp == obj.timestamp.Load() {
+			if timestamp == obj.timestamp {
 				c.data.Delete(key)
 			}
 		}
 
-	})}
-	obj.timestamp.Store(timestamp)
+	}), timestamp: timestamp}
 
 	c.data.Store(key, obj)
 }

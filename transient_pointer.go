@@ -2,7 +2,7 @@ package cache
 
 import (
 	"runtime"
-	"sync"
+	"sync/atomic"
 	"time"
 	"weak"
 )
@@ -12,14 +12,11 @@ type innerTransientPtr[T any] interface {
 }
 
 type innerTransientPtrExp[T any] struct {
-	mtx sync.RWMutex
-	ptr *T
+	ptr atomic.Pointer[T]
 }
 
 func (ptr *innerTransientPtrExp[T]) Value() *T {
-	ptr.mtx.RLock()
-	defer ptr.mtx.RUnlock()
-	return ptr.ptr
+	return ptr.ptr.Load()
 }
 
 // transientPtr is a transient pointer.
@@ -44,17 +41,14 @@ func makeTransientPtrGC[T any](p *T, cbs ...deleteCallback) transientPtr[T] {
 }
 
 func makeTransientPtrExpiring[T any](p *T, exp time.Duration, cbs ...deleteCallback) transientPtr[T] {
-	innerPtr := &innerTransientPtrExp[T]{
-		ptr: p,
-	}
+	innerPtr := new(innerTransientPtrExp[T])
+	innerPtr.ptr.Store(p)
 
 	time.AfterFunc(exp, func() {
 		for _, cb := range cbs {
 			cb()
 		}
-		innerPtr.mtx.Lock()
-		defer innerPtr.mtx.Unlock()
-		innerPtr.ptr = nil
+		innerPtr.ptr.Store(nil)
 	})
 
 	return transientPtr[T]{
