@@ -13,7 +13,7 @@ func TestTransientPtr(t *testing.T) {
 	req := require.New(t)
 	p := &person{"Oisin", 18}
 
-	tp := makeTransientPtr(p)
+	tp := makeTransientPtrGC(p)
 
 	testcond.Equal(t, "Oisin", tp.Pointer().Name)
 
@@ -30,7 +30,7 @@ func TestTransientPtr2(t *testing.T) {
 	var tps []transientPtr[person]
 	for i := 1; i <= iters; i++ {
 		p := &person{"Oisin", 18}
-		tp := makeTransientPtr(p)
+		tp := makeTransientPtrGC(p)
 		tps = append(tps, tp)
 
 		if i%1_000 == 0 {

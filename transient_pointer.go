@@ -4,22 +4,11 @@ import (
 	"runtime"
 	"sync"
 	"time"
-	"unsafe"
+	"weak"
 )
 
 type innerTransientPtr[T any] interface {
-	Pointer() *T
-}
-
-type innerTransientPtrGC[T any] struct {
-	mtx sync.RWMutex
-	ptr uintptr
-}
-
-func (ptr *innerTransientPtrGC[T]) Pointer() *T {
-	ptr.mtx.RLock()
-	defer ptr.mtx.RUnlock()
-	return *(**T)(unsafe.Pointer(&ptr.ptr))
+	Value() *T
 }
 
 type innerTransientPtrExp[T any] struct {
@@ -27,7 +16,7 @@ type innerTransientPtrExp[T any] struct {
 	ptr *T
 }
 
-func (ptr *innerTransientPtrExp[T]) Pointer() *T {
+func (ptr *innerTransientPtrExp[T]) Value() *T {
 	ptr.mtx.RLock()
 	defer ptr.mtx.RUnlock()
 	return ptr.ptr
@@ -40,22 +29,16 @@ type transientPtr[T any] struct {
 
 type deleteCallback = func()
 
-func makeTransientPtr[T any](p *T, cbs ...deleteCallback) transientPtr[T] {
-	innerPtr := &innerTransientPtrGC[T]{
-		ptr: uintptr(unsafe.Pointer(p)),
-	}
-
-	runtime.AddCleanup(p, func(ptr *innerTransientPtrGC[T]) {
+func makeTransientPtrGC[T any](p *T, cbs ...deleteCallback) transientPtr[T] {
+	runtime.AddCleanup(p, func(_ int) {
 		for _, cb := range cbs {
 			cb()
 		}
-		ptr.mtx.Lock()
-		defer ptr.mtx.Unlock()
-		ptr.ptr = 0
-	}, innerPtr)
+
+	}, 0)
 
 	return transientPtr[T]{
-		ptr: innerPtr,
+		ptr: weak.Make(p),
 	}
 
 }
@@ -81,5 +64,5 @@ func makeTransientPtrExpiring[T any](p *T, exp time.Duration, cbs ...deleteCallb
 
 // Pointer returns the pointer as an unsafe pointer.
 func (ptr transientPtr[T]) Pointer() *T {
-	return ptr.ptr.Pointer()
+	return ptr.ptr.Value()
 }

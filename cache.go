@@ -20,7 +20,7 @@ type Cache[K comparable, V any] struct {
 func (c *Cache[K, V]) Put(key K, value *V) *cacheObject[V] {
 	timestamp := time.Now()
 
-	obj := &cacheObject[V]{ptr: makeTransientPtr(value, func() {
+	obj := &cacheObject[V]{ptr: makeTransientPtrGC(value, func() {
 		if obj, ok := c.data.Load(key); ok {
 			obj := obj.(*cacheObject[V])
 			if timestamp.Equal(obj.timestamp) {
