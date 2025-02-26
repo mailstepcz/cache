@@ -2,7 +2,10 @@ module github.com/mailstepcz/cache
 
 go 1.24
 
-require github.com/stretchr/testify v1.10.0
+require (
+	github.com/mailstepcz/testutils v0.1.6
+	github.com/stretchr/testify v1.10.0
+)
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect

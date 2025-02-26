@@ -25,6 +25,7 @@ func (c *ObjectCache[K, V]) Put(key K, object *V) error {
 	if err := gob.NewEncoder(&buf).Encode(object); err != nil {
 		return err
 	}
+
 	c.data.Put(key, &ocachedObject{buf.Bytes()})
 	return nil
 }
