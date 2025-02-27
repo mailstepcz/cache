@@ -8,7 +8,7 @@ import (
 
 type cacheObject[T any] struct {
 	ptr       transientPtr[T]
-	timestamp time.Time
+	timestamp int64
 }
 
 // Cache is a cache for transient values.
@@ -18,12 +18,12 @@ type Cache[K comparable, V any] struct {
 
 // Put puts new value into the cache.
 func (c *Cache[K, V]) Put(key K, value *V) *cacheObject[V] {
-	timestamp := time.Now()
+	timestamp := time.Now().UnixNano()
 
 	obj := &cacheObject[V]{ptr: makeTransientPtrGC(value, func() {
 		if obj, ok := c.data.Load(key); ok {
 			obj := obj.(*cacheObject[V])
-			if timestamp.Equal(obj.timestamp) {
+			if timestamp == obj.timestamp {
 				c.data.Delete(key)
 			}
 		}
@@ -36,12 +36,12 @@ func (c *Cache[K, V]) Put(key K, value *V) *cacheObject[V] {
 
 // PutExpiring puts new value to the cache. Value will be removed after specified expiration.
 func (c *Cache[K, V]) PutExpiring(key K, value *V, exp time.Duration) {
-	timestamp := time.Now()
+	timestamp := time.Now().UnixNano()
 
 	obj := &cacheObject[V]{ptr: makeTransientPtrExpiring(value, exp, func() {
 		if obj, ok := c.data.Load(key); ok {
 			obj := obj.(*cacheObject[V])
-			if timestamp.Equal(obj.timestamp) {
+			if timestamp == obj.timestamp {
 				c.data.Delete(key)
 			}
 		}
