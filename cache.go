@@ -67,6 +67,13 @@ func (c *Cache[K, V]) Get(key K) (*V, bool) {
 	return nil, false
 }
 
+// Invalidate removes all entries from the cache.
+// Safe for concurrent use; any GC cleanup callbacks registered by Put will observe
+// a missing key and exit as a no-op.
+func (c *Cache[K, V]) Invalidate() {
+	c.data.Clear()
+}
+
 // GetAll returns all values stored in cache.
 func (c *Cache[K, V]) GetAll() iter.Seq2[K, *V] {
 	return func(yield func(K, *V) bool) {
